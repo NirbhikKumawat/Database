@@ -17,13 +17,16 @@ func (log *Log) Open() (err error) {
 func (log *Log) Close() error {
 	return log.fp.Close()
 }
-func (log *Log) Write(ent *Entry) (err error) {
-	_, err = log.fp.Write(ent.Encode())
+func (log *Log) Write(ent *Entry) error {
+	_, err := log.fp.Write(ent.Encode())
+	if err != nil {
+		return err
+	}
 	return log.fp.Sync()
 }
 func (log *Log) Read(ent *Entry) (eof bool, err error) {
 	err = ent.Decode(log.fp)
-	if err != io.EOF {
+	if err == io.EOF || err == io.ErrUnexpectedEOF || err == ErrBadSum {
 		return true, nil
 	} else if err != nil {
 		return false, err

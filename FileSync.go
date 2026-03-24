@@ -7,7 +7,7 @@ import (
 )
 
 func createFileSync(file string) (*os.File, error) {
-	fp, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
+	fp, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}
