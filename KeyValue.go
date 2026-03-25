@@ -7,6 +7,14 @@ type KeyValue struct {
 	memory map[string][]byte
 }
 
+type UpdateMode int
+
+const (
+	ModeUpsert UpdateMode = iota
+	ModeInsert
+	ModeUpdate
+)
+
 func (kv *KeyValue) Open() error {
 	if err := kv.log.Open(); err != nil {
 		return err
@@ -35,9 +43,18 @@ func (kv *KeyValue) Get(key []byte) (val []byte, ok bool, err error) {
 	val, ok = kv.memory[string(key)]
 	return
 }
-func (kv *KeyValue) Set(key []byte, val []byte) (updated bool, err error) {
-	prev, exists := kv.memory[string(key)]
-	updated = !exists || !bytes.Equal(prev, val)
+func (kv *KeyValue) SetEx(key []byte, val []byte, mode UpdateMode) (updated bool, err error) {
+	prev, exist := kv.memory[string(key)]
+	switch mode {
+	case ModeUpsert:
+		updated = !exist || !bytes.Equal(prev, val)
+	case ModeInsert:
+		updated = !exist
+	case ModeUpdate:
+		updated = !bytes.Equal(prev, val)
+	default:
+		panic("invalid mode")
+	}
 	if updated {
 		if err = kv.log.Write(&Entry{key: key, val: val}); err != nil {
 			return false, err
@@ -45,6 +62,9 @@ func (kv *KeyValue) Set(key []byte, val []byte) (updated bool, err error) {
 		kv.memory[string(key)] = val
 	}
 	return
+}
+func (kv *KeyValue) Set(key []byte, val []byte) (updated bool, err error) {
+	return kv.SetEx(key, val, ModeUpsert)
 }
 func (kv *KeyValue) Del(key []byte) (deleted bool, err error) {
 	_, deleted = kv.memory[string(key)]
