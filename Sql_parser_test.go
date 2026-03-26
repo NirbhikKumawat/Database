@@ -32,3 +32,9 @@ func testParseValue(t *testing.T, s string, ref Cell) {
 	assert.True(t, p.isEnd())
 	assert.Equal(t, ref, out)
 }
+
+func TestParseValue(t *testing.T) {
+	testParseValue(t, " -123 ", Cell{Type: TypeI64, I64: -123})
+	testParseValue(t, ` 'abc\'\"d' `, Cell{Type: TypeStr, Str: []byte("abc'\"d")})
+	testParseValue(t, ` "abc\'\"d" `, Cell{Type: TypeStr, Str: []byte("abc'\"d")})
+}

@@ -78,7 +78,7 @@ func (p *Parser) parseValue(out *Cell) error {
 	ch := p.buf[p.pos]
 	if ch == '"' || ch == '\'' {
 		return p.parseString(out)
-	} else if isDigit(ch) || ch == '_' || ch == '+' {
+	} else if isDigit(ch) || ch == '-' || ch == '+' {
 		return p.parseInt(out)
 	}
 	return errors.New("expected value")
@@ -91,7 +91,7 @@ func (p *Parser) parseInt(out *Cell) (err error) {
 	for curr < len(p.buf) && isDigit(p.buf[curr]) {
 		curr++
 	}
-	if out.I64, err = strconv.ParseInt(string(p.buf[start:curr]), 10, 64); err == nil {
+	if out.I64, err = strconv.ParseInt(p.buf[start:curr], 10, 64); err != nil {
 		return err
 	}
 	out.Type = TypeI64
@@ -107,6 +107,7 @@ func (p *Parser) parseString(out *Cell) (err error) {
 			curr++
 			if curr < len(p.buf) && (p.buf[curr] == '"' || p.buf[curr] == '\'') {
 				out.Str = append(out.Str, p.buf[curr])
+				curr++
 			} else {
 				return errors.New("bad escape")
 			}
