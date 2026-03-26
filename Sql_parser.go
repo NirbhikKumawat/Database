@@ -1,6 +1,10 @@
 package Database
 
-import "strings"
+import (
+	"errors"
+	"strconv"
+	"strings"
+)
 
 type Parser struct {
 	buf string
@@ -65,5 +69,55 @@ func (p *Parser) tryKeyword(kw string) bool {
 	}
 	p.pos += len(kw)
 	return true
-
+}
+func (p *Parser) parseValue(out *Cell) error {
+	p.skipSpaces()
+	if p.pos >= len(p.buf) {
+		return errors.New("expected value")
+	}
+	ch := p.buf[p.pos]
+	if ch == '"' || ch == '\'' {
+		return p.parseString(out)
+	} else if isDigit(ch) || ch == '_' || ch == '+' {
+		return p.parseInt(out)
+	}
+	return errors.New("expected value")
+}
+func (p *Parser) parseInt(out *Cell) (err error) {
+	start, curr := p.pos, p.pos
+	if p.buf[curr] == '-' || p.buf[curr] == '+' {
+		curr++
+	}
+	for curr < len(p.buf) && isDigit(p.buf[curr]) {
+		curr++
+	}
+	if out.I64, err = strconv.ParseInt(string(p.buf[start:curr]), 10, 64); err == nil {
+		return err
+	}
+	out.Type = TypeI64
+	p.pos = curr
+	return nil
+}
+func (p *Parser) parseString(out *Cell) (err error) {
+	quote := p.buf[p.pos]
+	curr := p.pos + 1
+	for curr < len(p.buf) {
+		ch := p.buf[curr]
+		if ch == '\\' {
+			curr++
+			if curr < len(p.buf) && (p.buf[curr] == '"' || p.buf[curr] == '\'') {
+				out.Str = append(out.Str, p.buf[curr])
+			} else {
+				return errors.New("bad escape")
+			}
+		} else if ch == quote {
+			out.Type = TypeStr
+			p.pos = curr + 1
+			return nil
+		} else {
+			out.Str = append(out.Str, p.buf[curr])
+			curr++
+		}
+	}
+	return errors.New("string not terminated")
 }

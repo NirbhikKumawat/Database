@@ -24,3 +24,11 @@ func TestParseKeyword(t *testing.T) {
 	assert.True(t, p.tryKeyword("SELECT"))
 	assert.True(t, p.tryKeyword("hello") && p.isEnd())
 }
+func testParseValue(t *testing.T, s string, ref Cell) {
+	p := NewParser(s)
+	out := Cell{}
+	err := p.parseValue(&out)
+	assert.Nil(t, err)
+	assert.True(t, p.isEnd())
+	assert.Equal(t, ref, out)
+}
