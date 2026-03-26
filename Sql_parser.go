@@ -10,6 +10,16 @@ type Parser struct {
 	buf string
 	pos int
 }
+type StmtSelect struct {
+	table string
+	cols  []string
+	keys  []NamedCell
+}
+
+type NamedCell struct {
+	column string
+	value  Cell
+}
 
 func NewParser(s string) Parser {
 	return Parser{buf: s, pos: 0}
@@ -70,6 +80,14 @@ func (p *Parser) tryKeyword(kw string) bool {
 	p.pos += len(kw)
 	return true
 }
+func (p *Parser) tryPunctuation(tok string) bool {
+	p.skipSpaces()
+	if !(p.pos+len(tok) <= len(p.buf) && p.buf[p.pos:p.pos+len(tok)] == tok) {
+		return false
+	}
+	p.pos += len(tok)
+	return true
+}
 func (p *Parser) parseValue(out *Cell) error {
 	p.skipSpaces()
 	if p.pos >= len(p.buf) {
@@ -121,4 +139,57 @@ func (p *Parser) parseString(out *Cell) (err error) {
 		}
 	}
 	return errors.New("string not terminated")
+}
+func (p *Parser) parseEqual(out *NamedCell) error {
+	var ok bool
+	out.column, ok = p.tryName()
+	if !ok {
+		return errors.New("expected column")
+	}
+	if !p.tryPunctuation("=") {
+		return errors.New("expected =")
+	}
+	return p.parseValue(&out.value)
+}
+func (p *Parser) parseSelect(out *StmtSelect) error {
+	if !p.tryKeyword("SELECT") {
+		return errors.New("expected keyword")
+	}
+	for !p.tryKeyword("FROM") {
+		if len(out.cols) > 0 && !p.tryPunctuation(",") {
+			return errors.New("expected comma")
+		}
+		if name, ok := p.tryName(); ok {
+			out.cols = append(out.cols, name)
+		} else {
+			return errors.New("expected column")
+		}
+	}
+	if len(out.cols) == 0 {
+		return errors.New("expected columns list")
+	}
+	var ok bool
+	if out.table, ok = p.tryName(); !ok {
+		return errors.New("expected table name")
+	}
+	return p.parseWhere(&out.keys)
+}
+func (p *Parser) parseWhere(out *[]NamedCell) error {
+	if !p.tryKeyword("WHERE") {
+		return errors.New("expected keyword")
+	}
+	for !p.tryPunctuation(";") {
+		expr := NamedCell{}
+		if len(*out) > 0 && !p.tryKeyword("AND") {
+			return errors.New("expected AND")
+		}
+		if err := p.parseEqual(&expr); err != nil {
+			return err
+		}
+		*out = append(*out, expr)
+	}
+	if len(*out) == 0 {
+		return errors.New("expect where clause")
+	}
+	return nil
 }
