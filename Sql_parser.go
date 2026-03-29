@@ -10,16 +10,6 @@ type Parser struct {
 	buf string
 	pos int
 }
-type StmtSelect struct {
-	table string
-	cols  []string
-	keys  []NamedCell
-}
-
-type NamedCell struct {
-	column string
-	value  Cell
-}
 
 func NewParser(s string) Parser {
 	return Parser{buf: s, pos: 0}
@@ -69,15 +59,20 @@ func (p *Parser) tryName() (string, bool) {
 	p.pos = curr
 	return p.buf[start:curr], true
 }
-func (p *Parser) tryKeyword(kw string) bool {
-	p.skipSpaces()
-	if !(p.pos+len(kw) <= len(p.buf) && strings.EqualFold(p.buf[p.pos:p.pos+len(kw)], kw)) {
-		return false
+func (p *Parser) tryKeyword(kws ...string) bool {
+	save := p.pos
+	for _, kw := range kws {
+		p.skipSpaces()
+		if !(p.pos+len(kw) <= len(p.buf) && strings.EqualFold(p.buf[p.pos:p.pos+len(kw)], kw)) {
+			p.pos = save
+			return false
+		}
+		if p.pos+len(kw) < len(p.buf) && !isSeparator(p.buf[p.pos+len(kw)]) {
+			p.pos = save
+			return false
+		}
+		p.pos += len(kw)
 	}
-	if p.pos+len(kw) < len(p.buf) && !isSeparator(p.buf[p.pos+len(kw)]) {
-		return false
-	}
-	p.pos += len(kw)
 	return true
 }
 func (p *Parser) tryPunctuation(tok string) bool {
@@ -150,46 +145,4 @@ func (p *Parser) parseEqual(out *NamedCell) error {
 		return errors.New("expected =")
 	}
 	return p.parseValue(&out.value)
-}
-func (p *Parser) parseSelect(out *StmtSelect) error {
-	if !p.tryKeyword("SELECT") {
-		return errors.New("expected keyword")
-	}
-	for !p.tryKeyword("FROM") {
-		if len(out.cols) > 0 && !p.tryPunctuation(",") {
-			return errors.New("expected comma")
-		}
-		if name, ok := p.tryName(); ok {
-			out.cols = append(out.cols, name)
-		} else {
-			return errors.New("expected column")
-		}
-	}
-	if len(out.cols) == 0 {
-		return errors.New("expected columns list")
-	}
-	var ok bool
-	if out.table, ok = p.tryName(); !ok {
-		return errors.New("expected table name")
-	}
-	return p.parseWhere(&out.keys)
-}
-func (p *Parser) parseWhere(out *[]NamedCell) error {
-	if !p.tryKeyword("WHERE") {
-		return errors.New("expected keyword")
-	}
-	for !p.tryPunctuation(";") {
-		expr := NamedCell{}
-		if len(*out) > 0 && !p.tryKeyword("AND") {
-			return errors.New("expected AND")
-		}
-		if err := p.parseEqual(&expr); err != nil {
-			return err
-		}
-		*out = append(*out, expr)
-	}
-	if len(*out) == 0 {
-		return errors.New("expect where clause")
-	}
-	return nil
 }
