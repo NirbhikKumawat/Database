@@ -1,10 +1,12 @@
 package Database
 
 type DB struct {
-	KV KeyValue
+	KV     KeyValue
+	tables map[string]Schema
 }
 
 func (db *DB) Open() error {
+	db.tables = map[string]Schema{}
 	return db.KV.Open()
 }
 func (db *DB) Close() error {
