@@ -7,6 +7,14 @@ type KV struct {
 	mem map[string][]byte
 }
 
+type UpdateMode int
+
+const (
+	ModeUpsert UpdateMode = 0
+	ModeInsert UpdateMode = 1
+	ModeUpdate UpdateMode = 2
+)
+
 func (kv *KV) Open() error {
 	if err := kv.log.Open(); err != nil {
 		return err
@@ -38,9 +46,18 @@ func (kv *KV) Get(key []byte) (val []byte, ok bool, err error) {
 	return
 }
 
-func (kv *KV) Set(key []byte, val []byte) (updated bool, err error) {
+func (kv *KV) SetEx(key []byte, val []byte, mode UpdateMode) (updated bool, err error) {
 	prev, exist := kv.mem[string(key)]
-	updated = !exist || !bytes.Equal(prev, val)
+	switch mode {
+	case ModeUpsert:
+		updated = !exist || !bytes.Equal(prev, val)
+	case ModeInsert:
+		updated = !exist
+	case ModeUpdate:
+		updated = exist && !bytes.Equal(prev, val)
+	default:
+		panic("unknown mode")
+	}
 	if updated {
 		if err = kv.log.Write(&Entry{key: key, val: val}); err != nil {
 			return false, err
@@ -48,6 +65,10 @@ func (kv *KV) Set(key []byte, val []byte) (updated bool, err error) {
 		kv.mem[string(key)] = val
 	}
 	return
+}
+
+func (kv *KV) Set(key []byte, val []byte) (updated bool, err error) {
+	return kv.SetEx(key, val, ModeUpsert)
 }
 
 func (kv *KV) Del(key []byte) (deleted bool, err error) {
